@@ -29,26 +29,30 @@ app = Sanic()
 async def main(request):
     return json({"hello": "world"})
 
-@app.route("/reset")
-async def reset(request):
+async def clear_globals():
     global current_bins
     global pending_bins
     global pending_tokens
     current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
     pending_bins = current_bins.copy()
     pending_tokens = {}
+
+@app.route("/reset")
+async def reset(request):
+    global pending_tokens
+    await clear_globals()
     return json(pending_bins)
 
-@app.route("/request", methods=["POST",])
+@app.route("/reset", methods=["POST",])
 async def post_reset(request):
     global max_per_bin
     global slop_factor
     global expiry_time
-    max_per_bin = request.max_per_bin  # max data required per bin
-    slop_factor = request.slop_factor  # allow up to this many tokens
-    expiry_time = timedelta(minutes=request.expiry_mins)  # token expiration delay
-    reset_json = reset(request)
-    return json({"status": "reset", "reset_json": reset_json})
+    max_per_bin = request.json['max_per_bin']  # max data required per bin
+    slop_factor = request.json['slop_factor']  # allow up to this many tokens
+    expiry_time = timedelta(minutes=request.json['expiry_mins'])  # token expiration delay
+    await clear_globals()
+    return json({"status": "reset-post"})
 
 async def flush_tokens():
     remove_tokens = []
