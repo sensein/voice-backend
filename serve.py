@@ -7,6 +7,14 @@ import uuid
 from sanic import Sanic
 from sanic.response import json, text
 
+import logging
+logger = logging.getLogger('vb')
+hdlr = logging.FileHandler('/vagrant/db.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.WARNING)
+
 max_per_bin = 1  # max data required per bin
 slop_factor = 1  # allow up to this many tokens
 expiry_time = timedelta(minutes=20)  # token expiration delay
@@ -32,6 +40,16 @@ async def reset(request):
     pending_tokens = {}
     return json(pending_bins)
 
+@app.route("/request", methods=["POST",])
+async def post_reset(request):
+    global max_per_bin
+    global slop_factor
+    global expiry_time
+    max_per_bin = request.max_per_bin  # max data required per bin
+    slop_factor = request.slop_factor  # allow up to this many tokens
+    expiry_time = timedelta(minutes=request.expiry_mins)  # token expiration delay
+    reset_json = reset(request)
+    return json({"status": "reset", "reset_json": reset_json})
 
 async def flush_tokens():
     remove_tokens = []
@@ -41,16 +59,16 @@ async def flush_tokens():
             pending_bins[rbin] = max(0, pending_bins[rbin] - 1)
             remove_tokens.append(k)
     for token in remove_tokens:
-        print('remove: {}'.format(token))
+        logger.info('remove: {}'.format(token))
         del pending_tokens[token]
 
 
 async def qualified(data):
-    print(current_bins, pending_bins, pending_tokens)
+    logger.info((current_bins, pending_bins, pending_tokens))
     ts = data["total_score"]
     if ts < 0 or ts > 27:
         return False, None
-    rbin = math.ceil(max(ts - 7, 0)/5)
+    rbin = min(4, math.ceil(max(ts - 5, 0)/5))
     if current_bins[rbin] < max_per_bin:
         await flush_tokens()
         if pending_bins[rbin] >= (max_per_bin + slop_factor):
@@ -64,7 +82,7 @@ async def get_token(rbin):
     token = str(uuid.uuid4())
     expiration = datetime.now() + expiry_time
     pending_tokens[token] = expiration, rbin
-    print('create: {0}-{1}-{2}'.format(token, expiration, rbin))
+    logger.info('create: {0}-{1}-{2}'.format(token, expiration, rbin))
     return token, expiration
 
 
@@ -75,6 +93,7 @@ async def before_start(app, uvloop):
 
 @app.route("/check", methods=["POST",])
 async def post_check(request):
+    logger.info("Starting check")
     qualresult, rbin = await qualified(request.json)
     if qualresult:
         token, expiration = await get_token(rbin)
@@ -96,4 +115,5 @@ async def post_submit(request):
     return json({"status": "accepted"})
 
 if __name__ == "__main__":
+    logger.info("Starting backend")
     app.run(host="0.0.0.0", port=8000)
