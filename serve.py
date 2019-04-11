@@ -5,15 +5,14 @@ import math
 import uuid
 
 from sanic import Sanic
+from sanic.log import logger
 from sanic.response import json, text
 
 import logging
-logger = logging.getLogger('vb')
 hdlr = logging.FileHandler('/vagrant/db.log')
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-hdlr.setFormatter(formatter)
+#formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+#hdlr.setFormatter(formatter)
 logger.addHandler(hdlr) 
-logger.setLevel(logging.WARNING)
 
 max_per_bin = 1  # max data required per bin
 slop_factor = 1  # allow up to this many tokens
@@ -105,12 +104,14 @@ async def post_check(request):
 
 @app.route("/submit", methods=["POST",])
 async def post_submit(request):
-    if request.token not in pending_tokens:
+    token = request.json['token']
+    logger.info((token, pending_tokens))
+    if token not in pending_tokens:
         return text("Token not valid")
     # add data
-    _, bin = pending_tokens[request.token]
+    _, bin = pending_tokens[token]
     current_bins[bin] += 1
-    del pending_tokens[request.token]
+    del pending_tokens[token]
     await flush_tokens()
     return json({"status": "accepted"})
 
