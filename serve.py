@@ -3,16 +3,76 @@ from datetime import datetime
 from datetime import timedelta 
 import math
 import uuid
+import sys
 
 from sanic import Sanic
-from sanic.log import logger
+from sanic.log import logger, error_logger, access_logger
 from sanic.response import json, text
 
-import logging
-hdlr = logging.FileHandler('/vagrant/db.log')
-#formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-#hdlr.setFormatter(formatter)
-logger.addHandler(hdlr) 
+LOG_SETTINGS = dict(
+    version=1,
+    disable_existing_loggers=False,
+    loggers={
+        "sanic.root": {"level": "INFO", "handlers": ["console", "consolefile"]},
+        "sanic.error": {
+            "level": "INFO",
+            "handlers": ["error_console", "error_consolefile"],
+            "propagate": True,
+            "qualname": "sanic.error",
+        },
+        "sanic.access": {
+            "level": "INFO",
+            "handlers": ["access_console", "access_consolefile"],
+            "propagate": True,
+            "qualname": "sanic.access",
+        },
+    },
+    handlers={
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "generic",
+            "stream": sys.stdout,
+        },
+        "error_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "generic",
+            "stream": sys.stderr,
+        },
+        "access_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "access",
+            "stream": sys.stdout,
+        },
+        "consolefile": {
+            'class': 'logging.FileHandler',
+            'filename': "/vagrant/console.log",
+            "formatter": "generic",
+        },
+        "error_consolefile": {
+            'class': 'logging.FileHandler',
+            'filename': "/vagrant/error.log",
+            "formatter": "generic",
+        },
+        "access_consolefile": {
+            'class': 'logging.FileHandler',
+            'filename': "/vagrant/access.log",
+            "formatter": "access",
+        },
+    },
+    formatters={
+        "generic": {
+            "format": "%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+            "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
+            "class": "logging.Formatter",
+        },
+        "access": {
+            "format": "%(asctime)s - (%(name)s)[%(levelname)s][%(host)s]: "
+            + "%(request)s %(message)s %(status)d %(byte)d",
+            "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
+            "class": "logging.Formatter",
+        },
+    },
+)
 
 max_per_bin = 1  # max data required per bin
 slop_factor = 1  # allow up to this many tokens
@@ -22,7 +82,7 @@ current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
 pending_bins = current_bins.copy()
 pending_tokens = {}
 
-app = Sanic()
+app = Sanic("voiceback", log_config=LOG_SETTINGS)
 
 
 @app.route("/")
