@@ -89,7 +89,7 @@ app = Sanic("voiceback", log_config=LOG_SETTINGS)
 CORS(app)
 
 config = {}
-config["upload"] = "./uploads/VoiceData"
+config["upload"] = "/vagrant/uploads/VoiceData"
 
 @app.route("/")
 async def main(request):
