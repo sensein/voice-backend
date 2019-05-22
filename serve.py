@@ -4,10 +4,13 @@ from datetime import timedelta
 import math
 import uuid
 import sys
+import os
 
 from sanic import Sanic
 from sanic.log import logger, error_logger, access_logger
+from sanic import response
 from sanic.response import json, text
+from sanic_cors import CORS, cross_origin
 
 LOG_SETTINGS = dict(
     version=1,
@@ -83,7 +86,10 @@ pending_bins = current_bins.copy()
 pending_tokens = {}
 
 app = Sanic("voiceback", log_config=LOG_SETTINGS)
+CORS(app)
 
+config = {}
+config["upload"] = "./uploads/VoiceData"
 
 @app.route("/")
 async def main(request):
@@ -168,11 +174,23 @@ async def post_check(request):
 
 @app.route("/submit", methods=["POST",])
 async def post_submit(request):
-    token = request.json['token']
+    token = request.form['token'][0]
     logger.info((token, pending_tokens))
     if token not in pending_tokens:
         return text("Token not valid")
     # add data
+    if not os.path.exists(config["upload"]):
+        os.makedirs(config["upload"])
+    data_file = request.files.get('file')
+    file_parameters = {
+        'body': data_file.body,
+        'name': data_file.name,
+        'type': data_file.type,
+    }
+    f = open(config['upload'] + "/" + 'study-data.zip', "wb")
+    f.write(file_parameters['body'])
+    f.close()
+
     _, bin = pending_tokens[token]
     current_bins[bin] += 1
     del pending_tokens[token]
