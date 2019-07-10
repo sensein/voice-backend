@@ -134,7 +134,10 @@ async def flush_tokens():
 
 async def qualified(data):
     logger.info((current_bins, pending_bins, pending_tokens))
-    ts = data["total_score"]
+    total_score = 'https://raw.githubusercontent.com/ReproNim/schema' \
+                   '-standardization/master/activities/PHQ-9/items' \
+                       '/phq9_total_score.jsonld'
+    ts = data[total_score]
     if ts < 0 or ts > 27:
         return False, None
     rbin = min(4, math.ceil(max(ts - 5, 0)/5))
@@ -160,16 +163,25 @@ async def before_start(app, uvloop):
     sem = await asyncio.Semaphore(100, loop=uvloop)
 
 
-@app.route("/check", methods=["POST",])
+@app.route("/check", methods=["POST", "OPTIONS"])
 async def post_check(request):
     logger.info("Starting check")
-    qualresult, rbin = await qualified(request.json)
-    if qualresult:
-        token, expiration = await get_token(rbin)
-        return json({"qualified": "yes",
-                     "token": token,
-                     "expiry": expiration})
-    return json({"qualified": "no"})
+    jsonobject = request.json
+    screening = 'https://raw.githubusercontent.com/sanuann/schema-standardization' \
+                '/branching_server_side_test/activities/VoiceScreening/voice_screening_schema.jsonld'
+    phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
+             '/master/activities/PHQ-9/phq9_schema.jsonld'
+    #print('$$$$$$$$ ', jsonobject)
+    if jsonobject is not None and screening in jsonobject and \
+            jsonobject[screening]:
+        print ('!! it works !!', jsonobject[screening][phq9_url])
+        qualresult, rbin = await qualified(jsonobject[screening][phq9_url])
+        if qualresult:
+            token, expiration = await get_token(rbin)
+            return json({"qualified": 1,
+                         "token": token,
+                         "expiry": expiration})
+    return json({"qualified": 0})
 
 
 @app.route("/submit", methods=["POST",])
@@ -189,6 +201,8 @@ async def post_submit(request):
     }
     f = open(config['upload'] + "/" + 'study-data.zip', "wb")
     f.write(file_parameters['body'])
+    print(request.headers['referer'], request.headers['user-agent'])
+    # write referer and user-agent info to file
     f.close()
 
     _, bin = pending_tokens[token]
