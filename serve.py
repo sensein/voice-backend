@@ -164,6 +164,7 @@ async def before_start(app, uvloop):
 
 
 @app.route("/check", methods=["POST", "OPTIONS"])
+@cross_origin(app, automatic_options=True)
 async def post_check(request):
     logger.info("Starting check")
     jsonobject = request.json
