@@ -168,20 +168,18 @@ async def before_start(app, uvloop):
 async def post_check(request):
     logger.info("Starting check")
     jsonobject = request.json
-    screening = 'https://raw.githubusercontent.com/sanuann/schema-standardization' \
-                '/branching_server_side_test/activities/VoiceScreening/voice_screening_schema.jsonld'
     phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
              '/master/activities/PHQ-9/phq9_schema.jsonld'
-    #print('$$$$$$$$ ', jsonobject)
-    if jsonobject is not None and screening in jsonobject and \
-            jsonobject[screening]:
-        print ('!! it works !!', jsonobject[screening][phq9_url])
-        qualresult, rbin = await qualified(jsonobject[screening][phq9_url])
-        if qualresult:
-            token, expiration = await get_token(rbin)
-            return json({"qualified": 1,
-                         "token": token,
-                         "expiry": expiration})
+    if jsonobject is not None:
+        screening = next(iter(jsonobject)) # change this if needed
+        if jsonobject[screening]:
+            print ('!! it works !!', jsonobject[screening][phq9_url])
+            qualresult, rbin = await qualified(jsonobject[screening][phq9_url])
+            if qualresult:
+                token, expiration = await get_token(rbin)
+                return json({"qualified": 1,
+                             "token": token,
+                             "expiry": expiration})
     return json({"qualified": 0})
 
 
