@@ -1,6 +1,6 @@
 # voice-backend server
 
-`pip install sanic`
+`pip install sanic` (works for python 3 only)
 
 
 
