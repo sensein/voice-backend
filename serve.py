@@ -48,17 +48,17 @@ LOG_SETTINGS = dict(
 		},
 		"consolefile": {
 			'class': 'logging.FileHandler',
-			'filename': "console.log",
+			'filename': "/vagrant/console.log",
 			"formatter": "generic",
 		},
 		"error_consolefile": {
 			'class': 'logging.FileHandler',
-			'filename': "error.log",
+			'filename': "/vagrant/error.log",
 			"formatter": "generic",
 		},
 		"access_consolefile": {
 			'class': 'logging.FileHandler',
-			'filename': "access.log",
+			'filename': "/vagrant/access.log",
 			"formatter": "access",
 		},
 	},
@@ -170,43 +170,27 @@ async def post_check(request):
 	phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
 			   '/master/activities/PHQ-9/phq9_schema.jsonld'
 	jsonobject = request.json
-	print ('--------', jsonobject)
-
 	scoreObj = item_generator(jsonobject, phq9_url)
 	if isinstance(scoreObj, dict):
-		print ('~~~~~~~', scoreObj)
 		qualresult, rbin = await qualified(scoreObj)
 		if qualresult:
 			token, expiration = await get_token(rbin)
-			print('qualified')
 			return json({"qualified": 1,
 						 "token": token,
 						 "expiry": expiration})
-
 	return json({"qualified": 0})
 
 
 def item_generator(json_input, phq9_url):
+	''' recursive iteration through nested json for a specific key '''
 	if isinstance(json_input, dict):
 		for k, v in json_input.items():
 			if k == phq9_url:
-				print('!! it works !!', v)
 				return v
 			else:
-				item_generator(v, phq9_url)
-	# if isinstance(json_input, dict):
-	#     for k, v in json_input.items():
-	#         if k == phq9_url:
-	#             print ('in first if---', v)
-	#             yield v
-	#         else:
-	#             for child_val in item_generator(v, phq9_url):
-	#                 print ('child va', child_val)
-	#                 yield child_val
-	# elif isinstance(json_input, list):
-	#     for item in json_input:
-	#         for item_val in item_generator(item, phq9_url):
-	#             yield item_val
+				return item_generator(v, phq9_url)
+	return None
+
 
 @app.route("/submit", methods=["POST",])
 async def post_submit(request):
