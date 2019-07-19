@@ -1,6 +1,6 @@
 import asyncio
-from datetime import datetime  
-from datetime import timedelta 
+from datetime import datetime
+from datetime import timedelta
 import math
 import uuid
 import sys
@@ -70,7 +70,7 @@ LOG_SETTINGS = dict(
         },
         "access": {
             "format": "%(asctime)s - (%(name)s)[%(levelname)s][%(host)s]: "
-            + "%(request)s %(message)s %(status)d %(byte)d",
+                      + "%(request)s %(message)s %(status)d %(byte)d",
             "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
             "class": "logging.Formatter",
         },
@@ -91,9 +91,11 @@ CORS(app)
 config = {}
 config["upload"] = "/vagrant/uploads/VoiceData"
 
+
 @app.route("/")
 async def main(request):
     return json({"hello": "world"})
+
 
 async def clear_globals():
     global current_bins
@@ -103,22 +105,26 @@ async def clear_globals():
     pending_bins = current_bins.copy()
     pending_tokens = {}
 
+
 @app.route("/reset")
 async def reset(request):
     global pending_tokens
     await clear_globals()
     return json(pending_bins)
 
-@app.route("/reset", methods=["POST",])
+
+@app.route("/reset", methods=["POST", ])
 async def post_reset(request):
     global max_per_bin
     global slop_factor
     global expiry_time
     max_per_bin = request.json['max_per_bin']  # max data required per bin
     slop_factor = request.json['slop_factor']  # allow up to this many tokens
-    expiry_time = timedelta(minutes=request.json['expiry_mins'])  # token expiration delay
+    expiry_time = timedelta(
+        minutes=request.json['expiry_mins'])  # token expiration delay
     await clear_globals()
     return json({"status": "reset-post"})
+
 
 async def flush_tokens():
     remove_tokens = []
@@ -135,12 +141,12 @@ async def flush_tokens():
 async def qualified(data):
     logger.info((current_bins, pending_bins, pending_tokens))
     total_score = 'https://raw.githubusercontent.com/ReproNim/schema' \
-                   '-standardization/master/activities/PHQ-9/items' \
-                       '/phq9_total_score.jsonld'
+                  '-standardization/master/activities/PHQ-9/items' \
+                  '/phq9_total_score.jsonld'
     ts = data[total_score]
     if ts < 0 or ts > 27:
         return False, None
-    rbin = min(4, math.ceil(max(ts - 5, 0)/5))
+    rbin = min(4, math.ceil(max(ts - 5, 0) / 5))
     if current_bins[rbin] < max_per_bin:
         await flush_tokens()
         if pending_bins[rbin] >= (max_per_bin + slop_factor):
@@ -167,23 +173,32 @@ async def before_start(app, uvloop):
 @cross_origin(app, automatic_options=True)
 async def post_check(request):
     logger.info("Starting check")
-    jsonobject = request.json
     phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
-             '/master/activities/PHQ-9/phq9_schema.jsonld'
-    if jsonobject is not None:
-        screening = next(iter(jsonobject)) # change this if needed
-        if jsonobject[screening]:
-            print ('!! it works !!', jsonobject[screening][phq9_url])
-            qualresult, rbin = await qualified(jsonobject[screening][phq9_url])
-            if qualresult:
-                token, expiration = await get_token(rbin)
-                return json({"qualified": 1,
-                             "token": token,
-                             "expiry": expiration})
+               '/master/activities/PHQ-9/phq9_schema.jsonld'
+    jsonobject = request.json
+    scoreObj = item_generator(jsonobject, phq9_url)
+    if isinstance(scoreObj, dict):
+        qualresult, rbin = await qualified(scoreObj)
+        if qualresult:
+            token, expiration = await get_token(rbin)
+            return json({"qualified": 1,
+                         "token": token,
+                         "expiry": expiration})
     return json({"qualified": 0})
 
 
-@app.route("/submit", methods=["POST",])
+def item_generator(json_input, phq9_url):
+    ''' recursive iteration through nested json for a specific key '''
+    if isinstance(json_input, dict):
+        for k, v in json_input.items():
+            if k == phq9_url:
+                return v
+            else:
+                return item_generator(v, phq9_url)
+    return None
+
+
+@app.route("/submit", methods=["POST", ])
 async def post_submit(request):
     token = request.form['token'][0]
     logger.info((token, pending_tokens))
@@ -209,6 +224,7 @@ async def post_submit(request):
     del pending_tokens[token]
     await flush_tokens()
     return json({"status": "accepted"})
+
 
 if __name__ == "__main__":
     logger.info("Starting backend")
