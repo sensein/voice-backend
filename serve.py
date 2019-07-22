@@ -5,6 +5,7 @@ import math
 import uuid
 import sys
 import os
+import time
 
 from sanic import Sanic
 from sanic.log import logger, error_logger, access_logger
@@ -213,7 +214,9 @@ async def post_submit(request):
         'name': data_file.name,
         'type': data_file.type,
     }
-    f = open(config['upload'] + "/" + 'study-data.zip', "wb")
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    # print ('@@@@@@@@@@@------ ', file_parameters['name'], file_parameters['type'])
+    f = open(config['upload'] + "/" + 'voice-study' + timestr + '.zip', "wb")
     f.write(file_parameters['body'])
     print(request.headers['referer'], request.headers['user-agent'])
     # write referer and user-agent info to file
