@@ -148,13 +148,13 @@ async def qualified(data):
     if ts < 0 or ts > 27:
         return False, None
     rbin = min(4, math.ceil(max(ts - 5, 0) / 5))
-    if current_bins[rbin] < max_per_bin:
-        await flush_tokens()
-        if pending_bins[rbin] >= (max_per_bin + slop_factor):
-            return True, None
-        pending_bins[rbin] += 1
-        return True, rbin
-    return True, None
+    # if current_bins[rbin] < max_per_bin:
+    #     await flush_tokens()
+    #     if pending_bins[rbin] >= (max_per_bin + slop_factor):
+    #         return True, None
+    #     pending_bins[rbin] += 1
+    #     return True, rbin
+    return True, rbin
 
 
 async def get_token(rbin):
