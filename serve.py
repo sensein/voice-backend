@@ -151,10 +151,10 @@ async def qualified(data):
     if current_bins[rbin] < max_per_bin:
         await flush_tokens()
         if pending_bins[rbin] >= (max_per_bin + slop_factor):
-            return False, None
+            return True, None
         pending_bins[rbin] += 1
         return True, rbin
-    return False, None
+    return True, None
 
 
 async def get_token(rbin):
