@@ -59,7 +59,7 @@ LOG_SETTINGS = dict(
         },
         "access_consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "/vagrant/access.log",
+            'filename': "access.log",
             "formatter": "access",
         },
     },
@@ -90,7 +90,7 @@ app = Sanic("voiceback", log_config=LOG_SETTINGS)
 CORS(app)
 
 config = {}
-config["upload"] = "/vagrant/uploads/VoiceData"
+config["upload"] = "./uploads/VoiceData"
 
 
 @app.route("/")
@@ -148,13 +148,13 @@ async def qualified(data):
     if ts < 0 or ts > 27:
         return False, None
     rbin = min(4, math.ceil(max(ts - 5, 0) / 5))
-    # if current_bins[rbin] < max_per_bin:
-    #     await flush_tokens()
-    #     if pending_bins[rbin] >= (max_per_bin + slop_factor):
-    #         return True, None
-    #     pending_bins[rbin] += 1
-    #     return True, rbin
-    return True, rbin
+    if current_bins[rbin] < max_per_bin:
+        await flush_tokens()
+        if pending_bins[rbin] >= (max_per_bin + slop_factor):
+            return False, None
+        pending_bins[rbin] += 1
+        return True, rbin
+    return False, None
 
 
 async def get_token(rbin):
