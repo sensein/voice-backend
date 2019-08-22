@@ -6,6 +6,7 @@ import uuid
 import sys
 import os
 import time
+import requests
 
 from sanic import Sanic
 from sanic.log import logger, error_logger, access_logger
@@ -202,6 +203,10 @@ def item_generator(json_input, phq9_url):
 @app.route("/submit", methods=["POST", ])
 async def post_submit(request):
     token = request.form['token'][0]
+    clientIP = request.form['clientIP'][0]
+    responseIP = requests.get(
+        'http://api.ipstack.com/'+clientIP+'?access_key=bdf36e09d60a795e09e0fe331a126aa2')
+    logger.info(responseIP.json())
     logger.info((token, pending_tokens))
     if token not in pending_tokens:
         return text("Token not valid")
