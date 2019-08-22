@@ -92,6 +92,9 @@ CORS(app)
 
 config = {}
 config["upload"] = "./uploads/VoiceData"
+f1 = open("./uploads/apiKey.txt", "r")
+ACCESS_KEY = f1.read()
+f1.close()
 
 
 @app.route("/")
@@ -205,7 +208,7 @@ async def post_submit(request):
     token = request.form['token'][0]
     clientIP = request.form['clientIP'][0]
     responseIP = requests.get(
-        'http://api.ipstack.com/'+clientIP+'?access_key=bdf36e09d60a795e09e0fe331a126aa2')
+        'http://api.ipstack.com/'+clientIP+'?access_key='+ACCESS_KEY)
     logger.info(responseIP.json())
     logger.info((token, pending_tokens))
     if token not in pending_tokens:
