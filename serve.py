@@ -91,8 +91,8 @@ app = Sanic("voiceback", log_config=LOG_SETTINGS)
 CORS(app)
 
 config = {}
-config["upload"] = "./uploads/VoiceData"
-f1 = open("./uploads/apiKey.txt", "r")
+config["upload"] = "/vagrant/uploads/VoiceData"
+f1 = open("/vagrant/uploads/apiKey.txt", "r")
 ACCESS_KEY = f1.read()
 f1.close()
 
