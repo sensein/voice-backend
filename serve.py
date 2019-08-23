@@ -79,9 +79,9 @@ LOG_SETTINGS = dict(
     },
 )
 
-max_per_bin = 1  # max data required per bin
-slop_factor = 1  # allow up to this many tokens
-expiry_time = timedelta(minutes=20)  # token expiration delay
+max_per_bin = 500  # max data required per bin
+slop_factor = 20  # allow up to this many tokens
+expiry_time = timedelta(minutes=60)  # token expiration delay
 
 current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
 pending_bins = current_bins.copy()
