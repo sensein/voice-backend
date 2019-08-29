@@ -178,7 +178,7 @@ async def before_start(app, uvloop):
 @cross_origin(app, automatic_options=True)
 async def post_check(request):
     logger.info("Starting check")
-    phq9_url = 'https://purl.org/repro/s/dev/activities/PHQ-9/phq9_schema'
+    phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization/master/activities/PHQ-9/phq9_schema'
     jsonobject = request.json
     scoreObj = item_generator(jsonobject, phq9_url)
     if isinstance(scoreObj, dict):
