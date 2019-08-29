@@ -147,7 +147,7 @@ async def qualified(data):
     logger.info((current_bins, pending_bins, pending_tokens))
     total_score = 'https://raw.githubusercontent.com/ReproNim/schema' \
                   '-standardization/master/activities/PHQ-9/items' \
-                  '/phq9_total_score.jsonld'
+                  '/phq9_total_score'
     ts = data[total_score]
     if ts < 0 or ts > 27:
         return False, None
