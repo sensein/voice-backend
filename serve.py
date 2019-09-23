@@ -50,17 +50,17 @@ LOG_SETTINGS = dict(
         },
         "consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "/vagrant/console.log",
+            'filename': "/vagrant/backend/console.log",
             "formatter": "generic",
         },
         "error_consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "/vagrant/error.log",
+            'filename': "/vagrant/backend/error.log",
             "formatter": "generic",
         },
         "access_consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "access.log",
+            'filename': "/vagrant/backend/access.log",
             "formatter": "access",
         },
     },
