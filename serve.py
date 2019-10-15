@@ -147,7 +147,7 @@ async def qualified(data):
     logger.info((current_bins, pending_bins, pending_tokens))
     total_score = 'https://raw.githubusercontent.com/ReproNim/schema' \
                   '-standardization/master/activities/PHQ-9/items' \
-                  '/phq9_total_score.jsonld'
+                  '/phq9_total_score'
     ts = data[total_score]
     if ts < 0 or ts > 27:
         return False, None
@@ -179,7 +179,7 @@ async def before_start(app, uvloop):
 async def post_check(request):
     logger.info("Starting check")
     phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
-               '/master/activities/PHQ-9/phq9_schema.jsonld'
+               '/master/activities/PHQ-9/phq9_schema'
     jsonobject = request.json
     scoreObj = item_generator(jsonobject, phq9_url)
     if isinstance(scoreObj, dict):
@@ -196,6 +196,7 @@ def item_generator(json_input, phq9_url):
     ''' recursive iteration through nested json for a specific key '''
     if isinstance(json_input, dict):
         for k, v in json_input.items():
+            print ('value of k -----', k)
             if k == phq9_url:
                 return v
             else:
