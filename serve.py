@@ -178,7 +178,8 @@ async def before_start(app, uvloop):
 @cross_origin(app, automatic_options=True)
 async def post_check(request):
     logger.info("Starting check")
-    phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization/master/activities/PHQ-9/phq9_schema'
+    phq9_url = 'https://raw.githubusercontent.com/ReproNim/schema-standardization' \
+               '/master/activities/PHQ-9/phq9_schema'
     jsonobject = request.json
     scoreObj = item_generator(jsonobject, phq9_url)
     if isinstance(scoreObj, dict):
@@ -195,6 +196,7 @@ def item_generator(json_input, phq9_url):
     ''' recursive iteration through nested json for a specific key '''
     if isinstance(json_input, dict):
         for k, v in json_input.items():
+            print ('value of k -----', k)
             if k == phq9_url:
                 return v
             else:
