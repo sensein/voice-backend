@@ -145,9 +145,8 @@ async def flush_tokens():
 
 async def qualified(data):
     logger.info((current_bins, pending_bins, pending_tokens))
-    total_score = 'https://raw.githubusercontent.com/ReproNim/schema' \
-                  '-standardization/master/activities/PHQ-9/items' \
-                  '/phq9_total_score'
+    total_score = 'https://raw.githubusercontent.com/ReproNim/reproschema/master' \
+                  '/activities/PHQ-9/items/phq9_total_score'
     ts = data[total_score]
     if ts < 0 or ts > 27:
         return False, None
@@ -196,7 +195,6 @@ def item_generator(json_input, phq9_url):
     ''' recursive iteration through nested json for a specific key '''
     if isinstance(json_input, dict):
         for k, v in json_input.items():
-            print('value of k -----', k)
             if k == phq9_url:
                 return v
             else:
