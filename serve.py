@@ -50,17 +50,17 @@ LOG_SETTINGS = dict(
         },
         "consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "/vagrant/console.log",
+            'filename': "/vagrant/backend/console.log",
             "formatter": "generic",
         },
         "error_consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "/vagrant/error.log",
+            'filename': "/vagrant/backend/error.log",
             "formatter": "generic",
         },
         "access_consolefile": {
             'class': 'logging.FileHandler',
-            'filename': "access.log",
+            'filename': "/vagrant/backend/access.log",
             "formatter": "access",
         },
     },
@@ -79,9 +79,9 @@ LOG_SETTINGS = dict(
     },
 )
 
-max_per_bin = 1  # max data required per bin
-slop_factor = 1  # allow up to this many tokens
-expiry_time = timedelta(minutes=20)  # token expiration delay
+max_per_bin = 500  # max data required per bin
+slop_factor = 20  # allow up to this many tokens
+expiry_time = timedelta(minutes=60)  # token expiration delay
 
 current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
 pending_bins = current_bins.copy()
@@ -91,8 +91,8 @@ app = Sanic("voiceback", log_config=LOG_SETTINGS)
 CORS(app)
 
 config = {}
-config["upload"] = "./uploads/VoiceData"
-f1 = open("./uploads/apiKey.txt", "r")
+config["upload"] = "/vagrant/uploads/VoiceData"
+f1 = open("/vagrant/uploads/apiKey.txt", "r")
 ACCESS_KEY = f1.read()
 f1.close()
 
