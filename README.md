@@ -11,14 +11,16 @@ the server locally.
 
 There are 3 types of ids:
 1. `token_id`: This is auto generated when the server is launched and is used 
-for the register process. This id should not be made public. 
+to register a client app. This id should not be made public. 
 2. `client_id`: This is the identifier returned during the registration process. 
-This id can be included in the source code.
+This id can be included in the source code. This id can be exchanged for an auth 
+token by a registered client app.
 3. `auth_token`: This id is generated as part of the handshake mechanism between
-the registered client app and the server.
+the registered client app and the server. This id can be used to submit data to
+the server.
 
-See the test_serve.py submit example to see how to formulate a POST request. 
-This version of the server can receive individual messages as a json object or 
+See the `test_serve.py` submit route example to see how to formulate a POST 
+request. This version of the server can receive individual messages as a json object or 
 an uploaded file.
 
 ### Usage Flow
