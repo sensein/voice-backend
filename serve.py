@@ -1,10 +1,9 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from datetime import timedelta
 import json
 import uuid
 import os
-import time
 import requests
 
 from sanic import Sanic
@@ -134,7 +133,7 @@ async def register(request):
 async def flush_tokens():
     remove_tokens = []
     for k, v in pending_tokens.items():
-        if v[0] < datetime.now():
+        if v < datetime.now(timezone.utc):
             remove_tokens.append(k)
     for token in remove_tokens:
         logger.info('remove: {}'.format(token))
@@ -156,7 +155,7 @@ async def generate_token(request):
         expiry_minutes = int(request.args['expiry_minutes'][0])
     # token expiration delay
     expiry_time = timedelta(minutes=expiry_minutes)
-    expiration = datetime.utcnow() + expiry_time
+    expiration = datetime.now(timezone.utc) + expiry_time
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
     callback_url = dynamic_map[request.args['client_id'][0]]["callback_url"]
@@ -169,27 +168,36 @@ async def generate_token(request):
 
 @app.route("/submit", methods=["POST", ])
 async def submit(request):
-    token = request.form['token'][0]
+    """
+    See the test_serve file for an example of how to encode this
+    """
+    if "auth_token" not in request.form:
+        return response.json({'status': 'Unauthorized'}, 403)
+    token = request.form['auth_token'][0]
     if token not in pending_tokens:
         return response.json({'status': 'Unauthorized token'}, 403)
-    if pending_tokens[token] > datetime.utcnow():
+    now = datetime.now(timezone.utc)
+    if now > pending_tokens[token]:
+        await flush_tokens()
         return response.json({'status': 'Token expired'}, 403)
     logger.info(f"Token: {token}")
-    logger.info(request.headers['referer'], request.headers['user-agent'])
     request_ip = request.remote_addr or request.ip
     if ACCESS_KEY is not None:
         response_ip = requests.get(
             'http://api.ipstack.com/'+request_ip+'?access_key='+ACCESS_KEY)
         logger.info(response_ip.json())
-    data_file = request.files.get('file')
-    logger.info(data_file.name, data_file.type)
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    filename = os.path.join(config['upload'],
-                            data_file.name + timestr + data_file.type)
-    logger.info(f"Filename: {filename}")
-    with open(filename, "wb") as fp:
-        fp.write(data_file.body)
-    del pending_tokens[token]
+    data_file = request.files.get('file', None)
+    if data_file is not None:
+        filename = os.path.join(config['upload'],
+                                str(now).replace(' ', 'T') + '_' + data_file.name)
+        with open(filename, "wb") as fp:
+            fp.write(data_file.body)
+    if "responses" in request.form:
+        responses = json.loads(request.form['responses'][0])
+        filename = os.path.join(config['upload'],
+                                str(now).replace(' ', 'T') + "_messages.json")
+        with open(filename, "wt") as fp:
+            json.dump(responses, fp, indent=2, sort_keys=False)
     await flush_tokens()
     return response.json({"status": "accepted"})
 
@@ -197,7 +205,7 @@ async def submit(request):
 if __name__ == "__main__":
     logger.info("Starting backend")
     if TOKEN is None:
-        TOKEN = str(uuid.uuid4()).split('-')[-1]
+        TOKEN = uuid.uuid4().hex
         logger.info(f"TOKEN={TOKEN}")
     if not os.path.exists(config["upload"]):
         os.makedirs(config["upload"])

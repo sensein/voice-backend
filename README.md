@@ -17,6 +17,10 @@ This id can be included in the source code.
 3. `auth_token`: This id is generated as part of the handshake mechanism between
 the registered client app and the server.
 
+See the test_serve.py submit example to see how to formulate a POST request. 
+This version of the server can receive individual messages as a json object or 
+an uploaded file.
+
 ### Usage Flow
 
 1. Register and retrieve a client id. This can be done outside of your client 

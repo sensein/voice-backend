@@ -1,3 +1,4 @@
+import json
 import sys
 
 from sanic import Sanic
@@ -9,11 +10,18 @@ app = Sanic("testback")
 
 client_id = None
 server = "http://localhost:8000"
+
+
 @app.route("/")
-async def main(request):
+def main(request):
     global client_id
     if client_id is None:
-        return html("Unknown client id")
+        return response.html("Unknown client id")
+    submit_code = ""
+    if "auth_token" in request.args:
+        submit_code = f"""
+<a href="/submit/?auth_token={request.args["auth_token"][0]}">Submit some data</a>        
+"""
     return response.html(f"""
 <html>
 <a href="{server}/token/?client_id={client_id}">No participant</a>
@@ -22,9 +30,60 @@ async def main(request):
 <br />
 <a href="{server}/token/?client_id={client_id}&participant_id=foo&expiry_minutes=5">With participant + expiry minutes</a>
 <br />
-{request.args or None}
+{request.args}
+<br />
+{submit_code}
 </html>
 """)
+
+
+dummy_response = [
+    {
+        "@context": "https://raw.githubusercontent.com/ReproNim/reproschema/master/contexts/generic",
+        "@type": "reproterms:ResponseActivity",
+        "@id": "uuid:a2bfd83a-871c-49c1-afe1-59941187104b",
+        "prov:used": [
+            "https://raw.githubusercontent.com/ReproNim/reproschema/master/activities/VoiceScreening/items/audio_check",
+            "https://raw.githubusercontent.com/sensein/covid19/master/voice/voice_schema",
+            "https://raw.githubusercontent.com/sensein/covid19/master/protocol/Covid19_schema"
+        ],
+        "lang": "en",
+        "prov:startedAtTime": "2020-05-02T15:31:26.989Z",
+        "prov:endedAtTime": "2020-05-02T15:31:38.424Z",
+        "prov:wasAssociatedWith": "https://sensein.github.io/covid19/",
+        "prov:generated": "uuid:ef5ec132-b5cc-45d6-9ff3-2f5cbc308226"
+    },
+    {
+        "@context": "https://raw.githubusercontent.com/ReproNim/reproschema/master/contexts/generic",
+        "@type": "reproterms:ResponseActivity",
+        "@id": "uuid:a2bfd83a-871c-49c1-afe1-59941187104b",
+        "prov:used": [
+            "https://raw.githubusercontent.com/ReproNim/reproschema/master/activities/VoiceScreening/items/audio_check",
+            "https://raw.githubusercontent.com/sensein/covid19/master/voice/voice_schema",
+            "https://raw.githubusercontent.com/sensein/covid19/master/protocol/Covid19_schema"
+        ],
+        "lang": "en",
+        "prov:startedAtTime": "2020-05-02T15:31:26.989Z",
+        "prov:endedAtTime": "2020-05-02T15:31:38.424Z",
+        "prov:wasAssociatedWith": "https://sensein.github.io/covid19/",
+        "prov:generated": "uuid:ef5ec132-b5cc-45d6-9ff3-2f5cbc308226"
+    },
+]
+
+
+@app.route("/submit")
+def submit(request):
+    auth_token = request.args["auth_token"][0]
+    files = {"file": ('README.md',
+                      open('README.md', 'rb'),
+                      'text/markdown')}
+    data = {"auth_token": auth_token,
+            "responses": json.dumps(dummy_response)}
+    req1 = requests.post(f"{server}/submit/", files=files, data=data)
+    # submit without files
+    req2 = requests.post(f"{server}/submit/", data=data)
+    return response.json([req1.json(), req2.json()])
+
 
 if __name__ == "__main__":
     logger.info(sys.argv)
