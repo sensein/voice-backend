@@ -1,15 +1,68 @@
-# voice-backend server
+## Backend data collection server for SIG projects 
 
-`pip install sanic` (works for python 3 only)
+To run install `pip install sanic` into a Python 3.6+ environment
 
+```shell
+python serve
+```
+This will generate a `<token_id>` in the console log that you will need to 
+register your clients. Please see the section on local development to test out 
+the server locally.
 
+There are 3 types of ids:
+1. `token_id`: This is auto generated when the server is launched and is used 
+to register a client app. This id should not be made public. 
+2. `client_id`: This is the identifier returned during the registration process. 
+This id can be included in the source code. This id can be exchanged for an auth 
+token by a registered client app.
+3. `auth_token`: This id is generated as part of the handshake mechanism between
+the registered client app and the server. This id can be used to submit data to
+the server.
 
-to check:
+See the `test_serve.py` submit route example to see how to formulate a POST 
+request. This version of the server can receive individual messages as a json object or 
+an uploaded file.
 
-`python serve.py`
+### Usage Flow
 
-`curl --header "Content-Type: application/json" --request POST --data '{"total_score":25}'  http://localhost:8000/check/`
+1. Register and retrieve a client id. This can be done outside of your client 
+app.
 
-one can reset internal state with:
+```
+<server_host_url>/register?token=<token_id>&callback_url=<encoded_callback_url>
+```
 
-`curl http://localhost:8000/reset/`
+The above request will return a `<client_id>`
+
+2. Use the `<client_id>` inside your app to retrieve a submission authorization 
+token:
+
+```
+<server_host_url>/token/?client_id=<client_id>
+```
+The above request will return an `<auth_token>` and an `<expiry>` time. Your 
+data submission will need this token and will have to happen before expiry 
+time.
+
+The default expiry time is 90 minutes from the request time. You can change this 
+by adding the following parameter `expiry_minutes=15` to your request.
+
+In addition, you can add the parameter `participant_id=<id>` to your request and 
+this will be added back to the callback url.
+
+## Local development settings
+
+Replace `<server_host_url>` with `http://localhost:8000`. The registration
+process will look like this.
+
+`http://localhost:8000/register?token=<token_id>&callback_url=<encoded_callback_url>`
+
+The production server will not accept any localhost authorizations. To use for 
+local development environment set the following environment variable: 
+`export DEV8dac6d02a913=1`
+
+There is a basic test script that can be used to test the server:
+
+```
+python test_serve.py <token_id>
+```

@@ -1,66 +1,61 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from datetime import timedelta
-import math
+import json
 import uuid
-import sys
 import os
-import time
 import requests
 
 from sanic import Sanic
-from sanic.log import logger, error_logger, access_logger
+from sanic.log import logger
 from sanic import response
-from sanic.response import json, text
-from sanic_cors import CORS, cross_origin
+from sanic_cors import CORS
 
+production = True and 'DEV8dac6d02a913' not in os.environ
+basedir = '/vagrant'
+basedir = basedir if production else os.getcwd()
+TOKEN = None
 LOG_SETTINGS = dict(
     version=1,
     disable_existing_loggers=False,
     loggers={
-        "sanic.root": {"level": "INFO", "handlers": ["console", "consolefile"]},
+        "sanic.root": {"level": "INFO", "handlers": ["consolefile"]},
         "sanic.error": {
             "level": "INFO",
-            "handlers": ["error_console", "error_consolefile"],
+            "handlers": ["error_consolefile"],
             "propagate": True,
             "qualname": "sanic.error",
         },
         "sanic.access": {
             "level": "INFO",
-            "handlers": ["access_console", "access_consolefile"],
+            "handlers": ["access_consolefile"],
             "propagate": True,
             "qualname": "sanic.access",
         },
     },
     handlers={
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "generic",
-            "stream": sys.stdout,
-        },
-        "error_console": {
-            "class": "logging.StreamHandler",
-            "formatter": "generic",
-            "stream": sys.stderr,
-        },
-        "access_console": {
-            "class": "logging.StreamHandler",
-            "formatter": "access",
-            "stream": sys.stdout,
-        },
         "consolefile": {
-            'class': 'logging.FileHandler',
-            'filename': "/vagrant/backend/console.log",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "when": 'D',
+            "interval": 7,
+            "backupCount": 10,
+            'filename': os.path.join(basedir, "backend", "console.log"),
             "formatter": "generic",
         },
         "error_consolefile": {
-            'class': 'logging.FileHandler',
-            'filename': "/vagrant/backend/error.log",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "when": 'D',
+            "interval": 7,
+            "backupCount": 10,
+            'filename': os.path.join(basedir, "backend", "error.log"),
             "formatter": "generic",
         },
         "access_consolefile": {
-            'class': 'logging.FileHandler',
-            'filename': "/vagrant/backend/access.log",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "when": 'D',
+            "interval": 7,
+            "backupCount": 10,
+            'filename': os.path.join(basedir, "backend", "access.log"),
             "formatter": "access",
         },
     },
@@ -79,163 +74,139 @@ LOG_SETTINGS = dict(
     },
 )
 
-max_per_bin = 500  # max data required per bin
-slop_factor = 20  # allow up to this many tokens
-expiry_time = timedelta(minutes=60)  # token expiration delay
-
-current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-pending_bins = current_bins.copy()
-pending_tokens = {}
-
-app = Sanic("voiceback", log_config=LOG_SETTINGS)
+if production:
+    app = Sanic("store", log_config=LOG_SETTINGS)
+else:
+    app = Sanic("store")
 CORS(app)
 
-config = {}
-config["upload"] = "/vagrant/uploads/VoiceData"
-f1 = open("/vagrant/uploads/apiKey.txt", "r")
-ACCESS_KEY = f1.read()
-f1.close()
+config = {"upload": os.path.join(basedir, "uploads", "Responses")}
+try:
+    with open(os.path.join(basedir, "uploads", "apiKey.txt", "r")) as fp:
+        ACCESS_KEY = fp.read()
+except FileNotFoundError:
+    ACCESS_KEY = None
+
+try:
+    with open(os.path.join(basedir, 'dynamic_map.json')) as fp:
+        dynamic_map = json.load(fp)
+except FileNotFoundError:
+    dynamic_map = {}
+
+pending_tokens = {}
+
+sem = None
+@app.listener('before_server_start')
+def before_start(sanic, loop):
+    global sem
+    sem = asyncio.Semaphore(100)
 
 
 @app.route("/")
 async def main(request):
-    return json({"hello": "world"})
+    return response.json({"hello": "world"})
 
 
-async def clear_globals():
-    global current_bins
-    global pending_bins
-    global pending_tokens
-    current_bins = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
-    pending_bins = current_bins.copy()
-    pending_tokens = {}
-
-
-@app.route("/reset")
-async def reset(request):
-    global pending_tokens
-    await clear_globals()
-    return json(pending_bins)
-
-
-@app.route("/reset", methods=["POST", ])
-async def post_reset(request):
-    global max_per_bin
-    global slop_factor
-    global expiry_time
-    max_per_bin = request.json['max_per_bin']  # max data required per bin
-    slop_factor = request.json['slop_factor']  # allow up to this many tokens
-    expiry_time = timedelta(
-        minutes=request.json['expiry_mins'])  # token expiration delay
-    await clear_globals()
-    return json({"status": "reset-post"})
+@app.route("/register", methods=["GET", ])
+async def register(request):
+    args = request.args
+    if 'token' not in args:
+        return response.json({'status': 'not_authorized'}, 403)
+    if args['token'][0] != TOKEN:
+        return response.json({'status': 'not_authorized_token'}, 403)
+    logger.info(request.url)
+    callback_url = request.args['callback_url'][0]
+    if production:
+        # Prevent accidental registration of local urls on production
+        # server
+        local_hosts = ["127.0.0.1", "//localhost"]
+        if any([key in callback_url for key in local_hosts]):
+            return response.json({'status': 'not_authorized_url'}, 403)
+    client_id = uuid.uuid4().hex
+    dynamic_map[client_id] = dict(callback_url=callback_url)
+    with open(os.path.join(basedir, 'dynamic_map.json'), 'wt') as fp:
+        json.dump(dynamic_map, fp)
+    logger.info(f"New client: {client_id} Callback: {callback_url}")
+    return response.json({"client_id": client_id})
 
 
 async def flush_tokens():
     remove_tokens = []
     for k, v in pending_tokens.items():
-        if v[0] < datetime.now():
-            rbin = v[1]
-            pending_bins[rbin] = max(0, pending_bins[rbin] - 1)
+        if v < datetime.now(timezone.utc):
             remove_tokens.append(k)
     for token in remove_tokens:
         logger.info('remove: {}'.format(token))
         del pending_tokens[token]
 
 
-async def qualified(data):
-    logger.info((current_bins, pending_bins, pending_tokens))
-    total_score = 'https://raw.githubusercontent.com/ReproNim/reproschema/master' \
-                  '/activities/PHQ-9/items/phq9_total_score'
-    ts = data[total_score]
-    if ts < 0 or ts > 27:
-        return False, None
-    rbin = min(4, math.ceil(max(ts - 5, 0) / 5))
-    if current_bins[rbin] < max_per_bin:
-        await flush_tokens()
-        if pending_bins[rbin] >= (max_per_bin + slop_factor):
-            return False, None
-        pending_bins[rbin] += 1
-        return True, rbin
-    return False, None
-
-
-async def get_token(rbin):
-    token = str(uuid.uuid4())
-    expiration = datetime.now() + expiry_time
-    pending_tokens[token] = expiration, rbin
-    logger.info('create: {0}-{1}-{2}'.format(token, expiration, rbin))
-    return token, expiration
-
-
-@app.listener('before_server_start')
-async def before_start(app, uvloop):
-    sem = await asyncio.Semaphore(100, loop=uvloop)
-
-
-@app.route("/check", methods=["POST", "OPTIONS"])
-@cross_origin(app, automatic_options=True)
-async def post_check(request):
-    logger.info("Starting check")
-    phq9_url = 'https://raw.githubusercontent.com/ReproNim/reproschema' \
-               '/master/activities/PHQ-9/phq9_schema'
-    jsonobject = request.json
-    scoreObj = item_generator(jsonobject, phq9_url)
-    if isinstance(scoreObj, dict):
-        qualresult, rbin = await qualified(scoreObj)
-        if qualresult:
-            token, expiration = await get_token(rbin)
-            return json({"qualified": 1,
-                         "token": token,
-                         "expiry": expiration})
-    return json({"qualified": 0})
-
-
-def item_generator(json_input, phq9_url):
-    ''' recursive iteration through nested json for a specific key '''
-    if isinstance(json_input, dict):
-        for k, v in json_input.items():
-            if k == phq9_url:
-                return v
-            else:
-                return item_generator(v, phq9_url)
-    return None
+@app.route("/token", methods=["GET"])
+async def generate_token(request):
+    logger.info(request.url)
+    is_authorized = False
+    if 'client_id' in request.args:
+        if request.args['client_id'][0] in dynamic_map:
+            is_authorized = True
+    if not is_authorized:
+        return response.json({'status': 'not_authorized'}, 403)
+    client_auth_token = uuid.uuid4().hex
+    expiry_minutes = 90
+    if 'expiry_minutes' in request.args:
+        expiry_minutes = int(request.args['expiry_minutes'][0])
+    # token expiration delay
+    expiry_time = timedelta(minutes=expiry_minutes)
+    expiration = datetime.now(timezone.utc) + expiry_time
+    logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
+    pending_tokens[client_auth_token] = expiration
+    callback_url = dynamic_map[request.args['client_id'][0]]["callback_url"]
+    callback_url += "?auth_token=" + client_auth_token
+    callback_url += "&expiry=" + str(expiration)
+    if "participant_id" in request.args:
+        callback_url += "&participant_id=" + request.args["participant_id"][0]
+    return response.redirect(callback_url)
 
 
 @app.route("/submit", methods=["POST", ])
-async def post_submit(request):
-    token = request.form['token'][0]
-    clientIP = request.form['clientIP'][0]
-    responseIP = requests.get(
-        'http://api.ipstack.com/'+clientIP+'?access_key='+ACCESS_KEY)
-    logger.info(responseIP.json())
-    logger.info((token, pending_tokens))
+async def submit(request):
+    """
+    See the test_serve file for an example of how to encode this
+    """
+    if "auth_token" not in request.form:
+        return response.json({'status': 'Unauthorized'}, 403)
+    token = request.form['auth_token'][0]
     if token not in pending_tokens:
-        return text("Token not valid")
-    # add data
-    if not os.path.exists(config["upload"]):
-        os.makedirs(config["upload"])
-    data_file = request.files.get('file')
-    file_parameters = {
-        'body': data_file.body,
-        'name': data_file.name,
-        'type': data_file.type,
-    }
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    # print ('@@@@@@@@@@@------ ', file_parameters['name'], file_parameters['type'])
-    f = open(config['upload'] + "/" + 'voice-study' + timestr + '.zip', "wb")
-    f.write(file_parameters['body'])
-    print(request.headers['referer'], request.headers['user-agent'])
-    # write referer and user-agent info to file
-    f.close()
-
-    _, bin = pending_tokens[token]
-    current_bins[bin] += 1
-    del pending_tokens[token]
+        return response.json({'status': 'Unauthorized token'}, 403)
+    now = datetime.now(timezone.utc)
+    if now > pending_tokens[token]:
+        await flush_tokens()
+        return response.json({'status': 'Token expired'}, 403)
+    logger.info(f"Token: {token}")
+    request_ip = request.remote_addr or request.ip
+    if ACCESS_KEY is not None:
+        response_ip = requests.get(
+            'http://api.ipstack.com/'+request_ip+'?access_key='+ACCESS_KEY)
+        logger.info(response_ip.json())
+    data_file = request.files.get('file', None)
+    if data_file is not None:
+        filename = os.path.join(config['upload'],
+                                str(now).replace(' ', 'T') + '_' + data_file.name)
+        with open(filename, "wb") as fp:
+            fp.write(data_file.body)
+    if "responses" in request.form:
+        responses = json.loads(request.form['responses'][0])
+        filename = os.path.join(config['upload'],
+                                str(now).replace(' ', 'T') + "_messages.json")
+        with open(filename, "wt") as fp:
+            json.dump(responses, fp, indent=2, sort_keys=False)
     await flush_tokens()
-    return json({"status": "accepted"})
+    return response.json({"status": "accepted"})
 
 
 if __name__ == "__main__":
     logger.info("Starting backend")
+    if TOKEN is None:
+        TOKEN = uuid.uuid4().hex
+        logger.info(f"TOKEN={TOKEN}")
+    if not os.path.exists(config["upload"]):
+        os.makedirs(config["upload"])
     app.run(host="0.0.0.0", port=8000)
