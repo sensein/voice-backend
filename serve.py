@@ -82,7 +82,7 @@ CORS(app)
 
 config = {"upload": os.path.join(basedir, "uploads", "Responses")}
 try:
-    with open(os.path.join(basedir, "uploads", "apiKey.txt", "r")) as fp:
+    with open(os.path.join(basedir, "uploads", "apiKey.txt"), "r") as fp:
         ACCESS_KEY = fp.read()
 except FileNotFoundError:
     ACCESS_KEY = None
