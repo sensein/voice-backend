@@ -11,7 +11,7 @@ from sanic.log import logger
 from sanic import response
 from sanic_cors import CORS
 
-production = True and 'DEV8dac6d02a913' not in os.environ
+production = 'DEV8dac6d02a913' not in os.environ
 basedir = '/vagrant'
 basedir = basedir if production else os.getcwd()
 TOKEN = None
@@ -87,12 +87,6 @@ try:
 except FileNotFoundError:
     ACCESS_KEY = None
 
-try:
-    with open(os.path.join(basedir, 'dynamic_map.json')) as fp:
-        dynamic_map = json.load(fp)
-except FileNotFoundError:
-    dynamic_map = {}
-
 pending_tokens = {}
 
 sem = None
@@ -107,29 +101,6 @@ async def main(request):
     return response.json({"hello": "world"})
 
 
-@app.route("/register", methods=["GET", ])
-async def register(request):
-    args = request.args
-    if 'token' not in args:
-        return response.json({'status': 'not_authorized'}, 403)
-    if args['token'][0] != TOKEN:
-        return response.json({'status': 'not_authorized_token'}, 403)
-    logger.info(request.url)
-    callback_url = request.args['callback_url'][0]
-    if production:
-        # Prevent accidental registration of local urls on production
-        # server
-        local_hosts = ["127.0.0.1", "//localhost"]
-        if any([key in callback_url for key in local_hosts]):
-            return response.json({'status': 'not_authorized_url'}, 403)
-    client_id = uuid.uuid4().hex
-    dynamic_map[client_id] = dict(callback_url=callback_url)
-    with open(os.path.join(basedir, 'dynamic_map.json'), 'wt') as fp:
-        json.dump(dynamic_map, fp)
-    logger.info(f"New client: {client_id} Callback: {callback_url}")
-    return response.json({"client_id": client_id})
-
-
 async def flush_tokens():
     remove_tokens = []
     for k, v in pending_tokens.items():
@@ -142,13 +113,11 @@ async def flush_tokens():
 
 @app.route("/token", methods=["GET"])
 async def generate_token(request):
-    logger.info(request.url)
-    is_authorized = False
-    if 'client_id' in request.args:
-        if request.args['client_id'][0] in dynamic_map:
-            is_authorized = True
-    if not is_authorized:
+    args = request.args
+    if 'token' not in args:
         return response.json({'status': 'not_authorized'}, 403)
+    if args['token'][0] != TOKEN:
+        return response.json({'status': 'not_authorized_token'}, 403)
     client_auth_token = uuid.uuid4().hex
     expiry_minutes = 90
     if 'expiry_minutes' in request.args:
@@ -158,12 +127,8 @@ async def generate_token(request):
     expiration = datetime.now(timezone.utc) + expiry_time
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
-    callback_url = dynamic_map[request.args['client_id'][0]]["callback_url"]
-    callback_url += "?auth_token=" + client_auth_token
-    callback_url += "&expiry=" + str(expiration)
-    if "participant_id" in request.args:
-        callback_url += "&participant_id=" + request.args["participant_id"][0]
-    return response.redirect(callback_url)
+    return response.json({"auth_token": client_auth_token,
+                          "expires": str(expiration)})
 
 
 @app.route("/submit", methods=["POST", ])

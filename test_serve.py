@@ -8,28 +8,18 @@ import requests
 
 app = Sanic("testback")
 
-client_id = None
+auth_token = None
 server = "http://localhost:8000"
 
 
 @app.route("/")
 def main(request):
-    global client_id
-    if client_id is None:
-        return response.html("Unknown client id")
-    submit_code = ""
-    if "auth_token" in request.args:
-        submit_code = f"""
-<a href="/submit/?auth_token={request.args["auth_token"][0]}">Submit some data</a>        
+    global auth_token
+    submit_code = f"""
+<a href="/submit/?auth_token={auth_token}">Submit some data</a>        
 """
     return response.html(f"""
 <html>
-<a href="{server}/token/?client_id={client_id}">No participant</a>
-<br />
-<a href="{server}/token/?client_id={client_id}&participant_id=foo">With participant</a>
-<br />
-<a href="{server}/token/?client_id={client_id}&participant_id=foo&expiry_minutes=5">With participant + expiry minutes</a>
-<br />
 {request.args}
 <br />
 {submit_code}
@@ -88,10 +78,9 @@ def submit(request):
 if __name__ == "__main__":
     logger.info(sys.argv)
     logger.info("Starting test service")
-    req = requests.get("http://localhost:8000/register",
-                       params={"token": sys.argv[1],
-                               "callback_url": "http://localhost:3000/"})
-    logger.info(f"{req.content}")
-    client_id = req.json()["client_id"]
-    logger.info(f"Received client id: {client_id}")
+    req = requests.get("http://localhost:8000/token",
+                       params={"token": sys.argv[1]})
+    logger.info(f"{req.json()}")
+    auth_token = req.json()["auth_token"]
+    logger.info(f"Received client id: {auth_token}")
     app.run(host="0.0.0.0", port=3000)
