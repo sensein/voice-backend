@@ -128,7 +128,7 @@ async def generate_token(request):
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
     return response.json({"auth_token": client_auth_token,
-                          "expires": str(expiration)})
+                          "expires": expiration.isoformat()})
 
 
 @app.route("/submit", methods=["POST", ])
@@ -145,6 +145,7 @@ async def submit(request):
     if now > pending_tokens[token]:
         await flush_tokens()
         return response.json({'status': 'Token expired'}, 403)
+    nowstr = now.isoformat().replace(":","").replace("-","").replace("+","Z")
     logger.info(f"Token: {token}")
     request_ip = request.remote_addr or request.ip
     if ACCESS_KEY is not None:
@@ -154,13 +155,13 @@ async def submit(request):
     data_file = request.files.get('file', None)
     if data_file is not None:
         filename = os.path.join(config['upload'],
-                                str(now).replace(' ', 'T') + '_' + data_file.name)
+                                nowstr + '-' + data_file.name)
         with open(filename, "wb") as fp:
             fp.write(data_file.body)
     if "responses" in request.form:
         responses = json.loads(request.form['responses'][0])
         filename = os.path.join(config['upload'],
-                                str(now).replace(' ', 'T') + "_messages.json")
+                                nowstr + "-messages.json")
         with open(filename, "wt") as fp:
             json.dump(responses, fp, indent=2, sort_keys=False)
     await flush_tokens()
