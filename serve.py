@@ -118,7 +118,10 @@ async def generate_token(request):
         return response.json({'status': 'not_authorized'}, 403)
     if args['token'][0] != TOKEN:
         return response.json({'status': 'not_authorized_token'}, 403)
-    client_auth_token = uuid.uuid4().hex
+    project = "unknown"
+    if 'project' in args:
+        project = args['project'][0]
+    client_auth_token = project + '-' + uuid.uuid4().hex
     expiry_minutes = 90
     if 'expiry_minutes' in request.args:
         expiry_minutes = int(request.args['expiry_minutes'][0])
@@ -153,15 +156,16 @@ async def submit(request):
             'http://api.ipstack.com/'+request_ip+'?access_key='+ACCESS_KEY)
         logger.info(response_ip.json())
     data_file = request.files.get('file', None)
+    upload_dir = os.path.join(config['upload'], token.split('-')[0])
     if data_file is not None:
-        filename = os.path.join(config['upload'],
-                                nowstr + '-' + data_file.name)
+        os.makedirs(upload_dir, mode=0o660, exist_ok=True)
+        filename = os.path.join(upload_dir, nowstr + '-' + data_file.name)
         with open(filename, "wb") as fp:
             fp.write(data_file.body)
     if "responses" in request.form:
+        os.makedirs(upload_dir, mode=0o660, exist_ok=True)
         responses = json.loads(request.form['responses'][0])
-        filename = os.path.join(config['upload'],
-                                nowstr + "-messages.json")
+        filename = os.path.join(upload_dir, nowstr + "-messages.json")
         with open(filename, "wt") as fp:
             json.dump(responses, fp, indent=2, sort_keys=False)
     await flush_tokens()
@@ -173,6 +177,5 @@ if __name__ == "__main__":
     if TOKEN is None:
         TOKEN = uuid.uuid4().hex
         logger.info(f"TOKEN={TOKEN}")
-    if not os.path.exists(config["upload"]):
-        os.makedirs(config["upload"])
+    os.makedirs(config["upload"], mode=0o660, exist_ok=True)
     app.run(host="0.0.0.0", port=8000)
