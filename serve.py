@@ -9,7 +9,7 @@ import requests
 from sanic import Sanic
 from sanic.log import logger
 from sanic import response
-from sanic_cors import CORS
+# from sanic_cors import CORS
 
 production = 'DEV8dac6d02a913' not in os.environ
 basedir = '/vagrant'
@@ -78,7 +78,7 @@ if production:
     app = Sanic("store", log_config=LOG_SETTINGS)
 else:
     app = Sanic("store")
-CORS(app)
+# CORS(app)
 
 config = {"upload": os.path.join(basedir, "uploads", "Responses")}
 try:
