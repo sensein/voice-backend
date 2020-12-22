@@ -131,7 +131,7 @@ async def generate_token(request):
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
     return response.json({"auth_token": client_auth_token,
-                          "expires": expiration.isoformat()})
+                          "expires": expiration.strftime("%Y%m%dT%H%M%SZ")})
 
 
 @app.route("/submit", methods=["POST", ])
