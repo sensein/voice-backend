@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # read existing tokens
     logger.info("Reading existing tokens")
     from glob import glob
-    fl = glob(os.path.join(basedir, "console.log*"))
+    fl = glob(os.path.join(basedir, "backend", "console.log*"))
     for f in fl:
         with open(f) as fp:
             data = fp.readlines()
