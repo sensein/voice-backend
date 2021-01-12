@@ -178,4 +178,17 @@ if __name__ == "__main__":
         TOKEN = uuid.uuid4().hex
         logger.info(f"TOKEN={TOKEN}")
     os.makedirs(config["upload"], mode=0o660, exist_ok=True)
+    # read existing tokens
+    from glob import glob
+    fl = glob(os.path.join(basedir, "console.log*"))
+    for f in fl:
+        with open(f) as fp:
+            data = fp.readlines()
+            for line in data:
+                if 'token:' in line.lower() and 'expiration:' in line.lower():
+                    token = line.split("Token: ")[-1].split()[0]
+                    expires = line.strip().split("Expiration: ")[-1]
+                    expires = datetime.fromisoformat(expires)
+                    if expires >= datetime.now(timezone.utc):
+                        pending_tokens[token] = expires
     app.run(host="0.0.0.0", port=8000)
