@@ -179,6 +179,7 @@ if __name__ == "__main__":
         logger.info(f"TOKEN={TOKEN}")
     os.makedirs(config["upload"], mode=0o660, exist_ok=True)
     # read existing tokens
+    logger.info("Reading existing tokens")
     from glob import glob
     fl = glob(os.path.join(basedir, "console.log*"))
     for f in fl:
@@ -191,4 +192,5 @@ if __name__ == "__main__":
                     expires = datetime.fromisoformat(expires)
                     if expires >= datetime.now(timezone.utc):
                         pending_tokens[token] = expires
+    logger.info("{} tokens found".format(len(pending_tokens)))
     app.run(host="0.0.0.0", port=8000)
