@@ -81,17 +81,18 @@ else:
 
 @app.listener('before_server_start')
 def before_start(app, loop):
-    config = {"upload": os.path.join(basedir, "uploads", "Responses")}
     try:
         with open(os.path.join(basedir, "uploads", "apiKey.txt"), "r") as fp:
             ACCESS_KEY = fp.read()
     except FileNotFoundError:
         ACCESS_KEY = None
-
-    if 'TOKEN' not in config:
-        config['TOKEN'] = uuid.uuid4().hex
-    config['pending_tokens'] = {}
-    config['ACCESS_KEY'] = ACCESS_KEY
+    config = app.config.get('CONFIG',
+                            {"upload": os.path.join(basedir,
+                                                    "uploads",
+                                                    "Responses"),
+                             'pending_tokens': {},
+                             'ACCESS_KEY': ACCESS_KEY,
+                             'TOKEN': uuid.uuid4().hex})
     logger.info(f"TOKEN={config['TOKEN']}")
     app.config['CONFIG'] = config
     os.makedirs(app.config['CONFIG']["upload"], mode=0o770, exist_ok=True)
