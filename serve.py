@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timezone
 from datetime import timedelta
 import json
@@ -14,7 +13,7 @@ from sanic import response
 production = 'DEV8dac6d02a913' not in os.environ
 basedir = '/vagrant'
 basedir = basedir if production else os.getcwd()
-TOKEN = None
+
 LOG_SETTINGS = dict(
     version=1,
     disable_existing_loggers=False,
@@ -80,20 +79,22 @@ else:
     app = Sanic("store")
 # CORS(app)
 
-config = {"upload": os.path.join(basedir, "uploads", "Responses")}
-try:
-    with open(os.path.join(basedir, "uploads", "apiKey.txt"), "r") as fp:
-        ACCESS_KEY = fp.read()
-except FileNotFoundError:
-    ACCESS_KEY = None
-
-pending_tokens = {}
-
-sem = None
 @app.listener('before_server_start')
-def before_start(sanic, loop):
-    global sem
-    sem = asyncio.Semaphore(100)
+def before_start(app, loop):
+    config = {"upload": os.path.join(basedir, "uploads", "Responses")}
+    try:
+        with open(os.path.join(basedir, "uploads", "apiKey.txt"), "r") as fp:
+            ACCESS_KEY = fp.read()
+    except FileNotFoundError:
+        ACCESS_KEY = None
+
+    if 'TOKEN' not in config:
+        config['TOKEN'] = uuid.uuid4().hex
+    config['pending_tokens'] = {}
+    config['ACCESS_KEY'] = ACCESS_KEY
+    logger.info(f"TOKEN={config['TOKEN']}")
+    app.config['CONFIG'] = config
+    os.makedirs(app.config['CONFIG']["upload"], mode=0o770, exist_ok=True)
 
 
 @app.route("/")
@@ -101,7 +102,7 @@ async def main(request):
     return response.json({"hello": "world"})
 
 
-async def flush_tokens():
+async def flush_tokens(pending_tokens):
     remove_tokens = []
     for k, v in pending_tokens.items():
         if v < datetime.now(timezone.utc):
@@ -114,9 +115,12 @@ async def flush_tokens():
 @app.route("/token", methods=["GET"])
 async def generate_token(request):
     args = request.args
+    config = request.app.config['CONFIG']
+    pending_tokens = config['pending_tokens']
+    logger.debug(config)
     if 'token' not in args:
         return response.json({'status': 'not_authorized'}, 403)
-    if args['token'][0] != TOKEN:
+    if args['token'][0] != config['TOKEN']:
         return response.json({'status': 'not_authorized_token'}, 403)
     project = "unknown"
     if 'project' in args:
@@ -142,11 +146,14 @@ async def submit(request):
     if "auth_token" not in request.form:
         return response.json({'status': 'Unauthorized'}, 403)
     token = request.form['auth_token'][0]
+    config = request.app.config['CONFIG']
+    pending_tokens = config['pending_tokens']
+    ACCESS_KEY = config.get('ACCESS_KEY')
     if token not in pending_tokens:
         return response.json({'status': 'Unauthorized token'}, 403)
     now = datetime.now(timezone.utc)
     if now > pending_tokens[token]:
-        await flush_tokens()
+        await flush_tokens(pending_tokens)
         return response.json({'status': 'Token expired'}, 403)
     nowstr = now.isoformat().replace(":","").replace("-","").replace("+","Z")
     logger.info(f"Token: {token}")
@@ -158,24 +165,21 @@ async def submit(request):
     data_file = request.files.get('file', None)
     upload_dir = os.path.join(config['upload'], token.split('-')[0])
     if data_file is not None:
-        os.makedirs(upload_dir, mode=0o660, exist_ok=True)
+        os.makedirs(upload_dir, mode=0o770, exist_ok=True)
         filename = os.path.join(upload_dir, nowstr + '-' + data_file.name)
         with open(filename, "wb") as fp:
             fp.write(data_file.body)
     if "responses" in request.form:
-        os.makedirs(upload_dir, mode=0o660, exist_ok=True)
+        os.makedirs(upload_dir, mode=0o770, exist_ok=True)
         responses = json.loads(request.form['responses'][0])
         filename = os.path.join(upload_dir, nowstr + "-messages.json")
         with open(filename, "wt") as fp:
             json.dump(responses, fp, indent=2, sort_keys=False)
-    await flush_tokens()
+    await flush_tokens(pending_tokens)
     return response.json({"status": "accepted"})
 
 
 if __name__ == "__main__":
     logger.info("Starting backend")
-    if TOKEN is None:
-        TOKEN = uuid.uuid4().hex
-        logger.info(f"TOKEN={TOKEN}")
-    os.makedirs(config["upload"], mode=0o660, exist_ok=True)
+    logger.debug(app.config)
     app.run(host="0.0.0.0", port=8000)

@@ -8,13 +8,12 @@ import requests
 
 app = Sanic("testback")
 
-auth_token = None
 server = "http://localhost:8000"
-
 
 @app.route("/")
 def main(request):
-    global auth_token
+    logger.debug(request.app.config)
+    auth_token = request.app.config['CONFIG']['auth_token']
     submit_code = f"""
 <a href="/submit/?auth_token={auth_token}">Submit some data</a>        
 """
@@ -69,18 +68,23 @@ def submit(request):
                       'text/markdown')}
     data = {"auth_token": auth_token,
             "responses": json.dumps(dummy_response)}
+    logger.debug(data)
     req1 = requests.post(f"{server}/submit/", files=files, data=data)
     # submit without files
     req2 = requests.post(f"{server}/submit/", data=data)
     return response.json([req1.json(), req2.json()])
 
 
-if __name__ == "__main__":
-    logger.info(sys.argv)
-    logger.info("Starting test service")
+@app.listener('before_server_start')
+def before_start(app, loop):
+    logger.debug(sys.argv)
     req = requests.get("http://localhost:8000/token",
                        params={"token": sys.argv[1]})
-    logger.info(f"{req.json()}")
-    auth_token = req.json()["auth_token"]
-    logger.info(f"Received client id: {auth_token}")
+    logger.debug(f"{req.json()}")
+    config = {'auth_token': req.json()["auth_token"]}
+    logger.info(f"{config}")
+    app.config['CONFIG'] = config
+
+if __name__ == "__main__":
+    logger.info("Starting test service")
     app.run(host="0.0.0.0", port=3000)
