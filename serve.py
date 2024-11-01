@@ -8,7 +8,7 @@ import requests
 from sanic import Sanic
 from sanic.log import logger
 from sanic import response
-# from sanic_cors import CORS
+from sanic_ext import Extend
 
 production = 'DEV8dac6d02a913' not in os.environ
 basedir = '/vagrant'
@@ -77,7 +77,9 @@ if production:
     app = Sanic("store", log_config=LOG_SETTINGS)
 else:
     app = Sanic("store")
-# CORS(app)
+
+app.config.CORS_ORIGINS = "*"
+Extend(app)
 
 @app.listener('before_server_start')
 def before_start(app, loop):
@@ -136,7 +138,7 @@ async def generate_token(request):
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
     return response.json({"auth_token": client_auth_token,
-                          "expires": expiration.strftime("%Y%m%dT%H%M%SZ")})
+                          "expiry_time": expiration.strftime("%Y%m%dT%H%M%SZ")})
 
 
 @app.route("/submit", methods=["POST", ])
