@@ -20,8 +20,11 @@ an uploaded file.
 
 ### Usage Flow
 
-1. Launch server. In production mode, the console log will have a `TOKEN`. Retrieve
-this token to then generate 
+0. Set the environment variable `REPROSCHEMA_BACKEND_BASEDIR` to indicate the directory
+where the logs and data will be stored. If not provided, it will default to a 
+directory called `reproschema_backend` in the current working directory.
+1. Launch server. In production mode, the console log will have a `TOKEN` in the logs 
+directory in the `REPROSCHEMA_BACKEND_BASEDIR`. Retrieve this token. 
 2. Use the `TOKEN` to retrieve an authorization token for submission.
 
 ```
