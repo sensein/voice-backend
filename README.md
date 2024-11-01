@@ -1,6 +1,6 @@
 ## Backend data collection server for SIG projects 
 
-To run install `pip install sanic` into a Python 3.6+ environment
+To run install `pip install sanic sanic-ext requests` into a Python 3.11+ environment
 
 ```shell
 python serve
@@ -9,14 +9,9 @@ This will generate a `<token_id>` in the console log that you will need to
 register your clients. Please see the section on local development to test out 
 the server locally.
 
-There are 3 types of ids:
-1. `token_id`: This is auto generated when the server is launched and is used 
-to register a client app. This id should not be made public. 
-2. `client_id`: This is the identifier returned during the registration process. 
-This id can be included in the source code. This id can be exchanged for an auth 
-token by a registered client app.
-3. `auth_token`: This id is generated as part of the handshake mechanism between
-the registered client app and the server. This id can be used to submit data to
+1. `token_id`: This is auto generated when the server is launched. This id should 
+not be made public. It is used to request authorization tokensfrom the server.
+2. `auth_token`: This is generated on request. This id can be used to submit data to
 the server.
 
 See the `test_serve.py` submit route example to see how to formulate a POST 
@@ -25,30 +20,34 @@ an uploaded file.
 
 ### Usage Flow
 
-1. Register and retrieve a client id. This can be done outside of your client 
-app.
+0. Set the environment variable `REPROSCHEMA_BACKEND_BASEDIR` to indicate the directory
+where the logs and data will be stored. If not provided, it will default to a 
+directory called `reproschema_backend` in the current working directory.
+1. Launch server. In production mode, the console log will have a `TOKEN` in the logs 
+directory in the `REPROSCHEMA_BACKEND_BASEDIR`. Retrieve this token. 
+2. Use the `TOKEN` to retrieve an authorization token for submission.
 
 ```
-<server_host_url>/register?token=<token_id>&callback_url=<encoded_callback_url>
+curl <server_host_url>/token/?token=TOKEN
 ```
 
-The above request will return a `<client_id>`
-
-2. Use the `<client_id>` inside your app to retrieve a submission authorization 
-token:
-
-```
-<server_host_url>/token/?client_id=<client_id>
-```
-The above request will return an `<auth_token>` and an `<expiry>` time. Your 
-data submission will need this token and will have to happen before expiry 
-time.
+The above request will return a JSON response containing `<auth_token>` and an 
+`<expiry_time>` time. Your data submission will need this token and will have 
+to happen before expiry time.
 
 The default expiry time is 90 minutes from the request time. You can change this 
 by adding the following parameter `expiry_minutes=15` to your request.
 
-In addition, you can add the parameter `participant_id=<id>` to your request and 
-this will be added back to the callback url.
+In addition, you can and should add the parameter `project=<project_name>` to your 
+request. This will allow you to submit data to multiple projects. On the server side,
+a separate directory will be created for each project.
+
+An example response for a locally running server.
+
+```shell
+$ curl 'http://localhost:8000/token?token=440482f593034d489d0b781bd31ccc3d&project=b2ai'
+{"auth_token":"b2ai-15055d9b53bf485a8b9be87761dba01c","expires":"20241101T023615Z"}
+```
 
 ## Local development settings
 

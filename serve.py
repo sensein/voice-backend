@@ -8,10 +8,10 @@ import requests
 from sanic import Sanic
 from sanic.log import logger
 from sanic import response
-# from sanic_cors import CORS
+from sanic_ext import Extend
 
 production = 'DEV8dac6d02a913' not in os.environ
-basedir = '/vagrant'
+basedir = os.environ.get('REPROSCHEMA_BACKEND_BASEDIR', os.getcwd() + '/reproschema_backend')
 basedir = basedir if production else os.getcwd()
 
 LOG_SETTINGS = dict(
@@ -38,7 +38,7 @@ LOG_SETTINGS = dict(
             "when": 'D',
             "interval": 7,
             "backupCount": 10,
-            'filename': os.path.join(basedir, "backend", "console.log"),
+            'filename': os.path.join(basedir, "logs", "console.log"),
             "formatter": "generic",
         },
         "error_consolefile": {
@@ -46,7 +46,7 @@ LOG_SETTINGS = dict(
             "when": 'D',
             "interval": 7,
             "backupCount": 10,
-            'filename': os.path.join(basedir, "backend", "error.log"),
+            'filename': os.path.join(basedir, "logs", "error.log"),
             "formatter": "generic",
         },
         "access_consolefile": {
@@ -54,7 +54,7 @@ LOG_SETTINGS = dict(
             "when": 'D',
             "interval": 7,
             "backupCount": 10,
-            'filename': os.path.join(basedir, "backend", "access.log"),
+            'filename': os.path.join(basedir, "logs", "access.log"),
             "formatter": "access",
         },
     },
@@ -74,10 +74,13 @@ LOG_SETTINGS = dict(
 )
 
 if production:
+    os.makedirs(basedir + "/logs", mode=0o770, exist_ok=True)
     app = Sanic("store", log_config=LOG_SETTINGS)
 else:
     app = Sanic("store")
-# CORS(app)
+
+app.config.CORS_ORIGINS = "*"
+Extend(app)
 
 @app.listener('before_server_start')
 def before_start(app, loop):
@@ -89,7 +92,7 @@ def before_start(app, loop):
     config = app.config.get('CONFIG',
                             {"upload": os.path.join(basedir,
                                                     "uploads",
-                                                    "Responses"),
+                                                    "responses"),
                              'pending_tokens': {},
                              'ACCESS_KEY': ACCESS_KEY,
                              'TOKEN': uuid.uuid4().hex})
@@ -136,7 +139,7 @@ async def generate_token(request):
     logger.info(f"Token: {client_auth_token} Expiration: {expiration}")
     pending_tokens[client_auth_token] = expiration
     return response.json({"auth_token": client_auth_token,
-                          "expires": expiration.strftime("%Y%m%dT%H%M%SZ")})
+                          "expiry_time": expiration.strftime("%Y%m%dT%H%M%SZ")})
 
 
 @app.route("/submit", methods=["POST", ])
